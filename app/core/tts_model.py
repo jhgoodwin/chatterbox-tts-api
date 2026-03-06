@@ -6,6 +6,33 @@ import os
 import asyncio
 from enum import Enum
 from typing import Optional, Dict, Any
+
+# Patch torch.load before importing chatterbox to handle MPS/CPU compatibility
+import torch
+original_load = torch.load
+original_load_file = None
+
+# Try to patch safetensors if available
+try:
+    import safetensors.torch
+    original_load_file = safetensors.torch.load_file
+except ImportError:
+    pass
+
+def force_cpu_torch_load(filename, *args, **kwargs):
+    # Force CPU device mapping, ignore any device parameter
+    kwargs['map_location'] = 'cpu'
+    return original_load(filename, *args, **kwargs)
+
+def force_cpu_load_file(filename, *args, **kwargs):
+    # Force CPU for safetensors loading too
+    return original_load_file(filename, *args, **kwargs)
+
+# Apply patches immediately
+torch.load = force_cpu_torch_load
+if original_load_file:
+    safetensors.torch.load_file = force_cpu_load_file
+
 from chatterbox.tts import ChatterboxTTS
 from chatterbox.mtl_tts import ChatterboxMultilingualTTS
 from app.core.mtl import SUPPORTED_LANGUAGES
@@ -54,30 +81,7 @@ async def initialize_model():
             raise FileNotFoundError(f"Voice sample not found: {Config.VOICE_SAMPLE_PATH}")
         
         _initialization_progress = "Configuring device compatibility..."
-        # Patch torch.load for CPU compatibility if needed
-        if _device == 'cpu':
-            import torch
-            original_load = torch.load
-            original_load_file = None
-            
-            # Try to patch safetensors if available
-            try:
-                import safetensors.torch
-                original_load_file = safetensors.torch.load_file
-            except ImportError:
-                pass
-            
-            def force_cpu_torch_load(f, map_location=None, **kwargs):
-                # Always force CPU mapping if we're on a CPU device
-                return original_load(f, map_location='cpu', **kwargs)
-            
-            def force_cpu_load_file(filename, device=None):
-                # Force CPU for safetensors loading too
-                return original_load_file(filename, device='cpu')
-            
-            torch.load = force_cpu_torch_load
-            if original_load_file:
-                safetensors.torch.load_file = force_cpu_load_file
+        # Note: torch.load already patched at module import for CPU/MPS compatibility
         
         # Determine if we should use multilingual model
         use_multilingual = Config.USE_MULTILINGUAL_MODEL

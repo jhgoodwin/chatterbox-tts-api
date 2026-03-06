@@ -7,7 +7,7 @@ set -e
 echo "🚀 Installing Chatterbox TTS API..."
 
 # Check Python version
-python_version=$(python3 --version 2>&1 | grep -oP '(?<=Python )\d+\.\d+')
+python_version=$(python3 --version 2>&1 | sed 's/Python //')
 required_version="3.11"
 
 if ! python3 -c "import sys; exit(0 if sys.version_info >= (3, 11) else 1)" 2>/dev/null; then
@@ -53,10 +53,13 @@ echo "🎉 Installation complete!"
 echo ""
 echo "To start the API:"
 echo "  source venv/bin/activate"
-echo "  python api.py"
+echo "  python main.py"
+echo ""
+echo "For development with auto-reload:"
+echo "  python start.py dev"
 echo ""
 echo "Alternative with uv (faster, better dependency resolution):"
-echo "  uv sync && uv run api.py"
+echo "  uv sync && uv run main.py"
 echo "  See docs/UV_MIGRATION.md for details"
 echo ""
 echo "Or with Docker:"
